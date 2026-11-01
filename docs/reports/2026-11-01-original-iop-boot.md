@@ -1,10 +1,14 @@
 <!-- coderabbit-ai-generated:v1 -->
 
+<!-- coderabbit-ai-generated-section:v1:38db7624d00ded02ea637b56ccf80417de128cdc2f8a372f8519ef67531d8282 -->
+
+<!-- coderabbit-ai-generated-section:v1:f6a3b8e8aa023b13968f60ecf7b528573f86e302780b2fca537cc87696a6c41b -->
+
 # Inicialização com módulos originais do disco
 
 ## Avanço verificado
 
-O SCUS original passou a carregar KERNEL e MANAGER e chegou à entrada do GAMECORE (`0x01344788`) sem injeção manual de FILEIO, LIBSD ou SG2IOPM1. A execução ainda usa corpos C++ recompilados a partir de capturas dos módulos relocados. Isso verifica uma etapa de inicialização em Linux; não demonstra jogo jogável ou execução no Xbox.
+O SCUS original passou a executar KERNEL, MANAGER e GAMECORE (`0x01344788`) sem injeção manual de FILEIO, LIBSD ou SG2IOPM1. O GAMECORE inicializa callbacks de vídeo, encontra NICO.DAT e entra na rotina de verificação do cartão de memória. A execução ainda usa corpos C++ recompilados a partir de capturas dos módulos relocados. Isso verifica uma etapa de inicialização em Linux; não demonstra jogo jogável ou execução no Xbox.
 
 ## Reparos
 
@@ -37,7 +41,15 @@ PS2X_CAPTURE_MISSING_DIR=/caminho/captura-manager \
   build/validation/ps2xRuntime/ps2EntryRunner /caminho/disco/SCUS_974.72
 ```
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:6358e753220bdd6dc54cb1b4b3acd99c85e7cf76e362d7a44573f53bb2d830e9 -->
+
 Repita a geração em outro destino incluindo `--manager-ram /caminho/captura-manager/ram.bin`. Após compilar, execute novamente o SCUS para capturar a entrada do GAMECORE. Finalmente gere outro destino com as três opções `--kernel-ram`, `--manager-ram` e `--gamecore-ram` e compile esse `generated/`.
+
+Para diagnósticos prolongados, desative `PS2X_ENABLE_AGRESSIVE_LOGS` na configuração CMake. O trace por função produziu cerca de 145 MiB em uma única execução limitada e dificulta observar o progresso. A configuração Debug sem esse trace também avançou lentamente; tempo de execução no host não equivale a tempo de jogo emulado.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 A ferramenta recusa destinos existentes ou dentro do repositório, exige capturas EE completas de 32 MiB e verifica o SHA256 do SCUS suportado. Registra hashes dos módulos, capturas, ferramentas e configuração em `manifest.json`, junto com os logs da combinação/recompilação. As capturas determinam endereços do diagnóstico: não oferecem tratamento geral de qualquer disposição dinâmica dos módulos.
 
@@ -47,10 +59,28 @@ A ferramenta recusa destinos existentes ou dentro do repositório, exige captura
 - Cinco suítes IOP passaram, incluindo registro/remoção de RPC por IRX carregado em bytes, rejeição de imagem inválida e persistência/reset do buffer CDVDFSV.
 - As 47 verificações isoladas de captura/cache e os 18 testes Python anteriores foram reutilizados, sem mudanças em seus insumos relevantes.
 - Reconstrução KERNEL/MANAGER: 5.052 funções processadas, 4.864 recompiladas, 188 stubs, 510 avisos, nenhum erro de geração ou decode. O runner compilou.
-- Execução do SCUS original: KERNEL e MANAGER executados, GAMECORE carregado e entrada alcançada. O processo foi encerrado com TERM após salvar a captura; não foi saída normal do jogo.
+- Reconstrução com os três módulos: 9.024 funções processadas, 8.836 recompiladas, 188 stubs, 670 avisos, nenhum erro de geração ou decode. As 26.624 referências importadas configuradas usam leitura dos campos relocados em memória. O runner compilou com esse conjunto.
+- Execução do SCUS original com GAMECORE compilado: alcançou `initgcmaingp`, callbacks de quadro/fim de quadro e `st_mcBootChk`. Uma execução Debug sem trace por função foi limitada a 300 segundos (saída 124). Nenhuma função faltante foi capturada; a imagem continuou preta com indicador de carregamento. Isso não comprova renderização correta nem jogabilidade.
+- A última captura dessa execução Debug registrou contador GP do KERNEL em 72 e contador de callback do jogo em 1. A rotina do cartão estava esperando a variável de prontidão `0x014664c4`. A execução otimizada posterior superou essa espera, como descrito abaixo. Os contadores são observações pontuais, não uma medida de FPS.
+- O GDB confirmou que a remoção da thread de inicialização 6 é solicitada pelo próprio jogo. Esse encerramento não foi tratado como defeito do escalonador. Os diagnósticos foram de leitura, sem forçar flags ou modificar RAM convidada.
 
 Os logs e capturas ficam em `inputs/sotc/runs/`, fora do Git. Nenhum arquivo do disco ou corpo recompilado do jogo é incluído no commit.
+
+## Execução otimizada e falha gráfica seguinte
+
+Uma configuração separada Release com `-O1 -DNDEBUG`, trace por função desligado e os mesmos módulos gerados compilou. Os 460 testes C++ passaram novamente nessa configuração. FFmpeg, Studio e debug UI estavam desativados; a execução usou OpenGL por software, sem áudio disponível.
+
+O SCUS original foi executado em Xvfb sob GDB, com limite de 360 segundos (saída 124). Foram observadas `stagemanager_loadstagecore`, `initlayout` e `bootmccheck`. A prontidão `0x014664c4` passou a 1 e o diálogo do cartão atingiu o estado 2. Entradas normais de teclado correspondentes a **baixo e X**, mantidas por cinco segundos cada para atravessar os quadros lentos do diagnóstico, fizeram a conclusão `0x011e0158` passar a 1. Nenhuma flag ou RAM do convidado foi modificada pelo debugger. Enter e X posteriores não comprovaram mudança de cena.
+
+A imagem passou do indicador de carregamento para fragmentos de texto e faixas claras sobre preto. A leitura direta da VRAM confirmou esses fragmentos no framebuffer exibido; não foi demonstrado menu legível ou cenário. O processamento GP avançou após a seleção, mas deixou de avançar nas últimas capturas enquanto surgiam erros VU1.
+
+Um breakpoint identificou que `instruction=0xfffffffb` é o sinal interno do limite de acumulação PATH1/XGKICK. Não representa uma instrução VU desconhecida: a instrução real naquele PC era diferente e a geração do cache correspondia à memória. A captura de 1.600 bytes do pacote mostrou um novo GIFtag após 1.584 bytes, declarando um payload maior que a capacidade restante de 64 KiB. A origem VU era o offset 16.192. A causa dos campos incorretos ou do pacote excessivo ainda não foi determinada entre a produção dos dados e o processamento VIF/VU. Aumentar o limite não constitui uma correção comprovada.
+
+Esse é o próximo bloqueio reproduzido. A execução otimizada demonstra que a espera inicial do cartão não era permanente e confirma a entrega de entrada pelo fluxo original; não estabelece jogabilidade.
 
 ## Xbox e limitações
 
 O alvo verificado é desktop Linux com OpenGL 3.3 e Xvfb, sem dispositivo de áudio. Ainda faltam renderização/fluxo jogável, backend e projeto compatíveis com Xbox, pacote e validação com SDK Windows e console real. Não existe pacote Xbox entregue por este avanço.
+
+
+<!-- /coderabbit-ai-generated:v1 -->

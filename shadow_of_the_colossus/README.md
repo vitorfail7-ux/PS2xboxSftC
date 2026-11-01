@@ -241,7 +241,19 @@ The supplied `SCUS_974.72` ELF has SHA-256 `d16ad76ba8cdf87695d94b1316d51c1f2489
 
 <!-- coderabbit-ai-generated-section:v1:381fb6c4973a8591859934169df024ef0c42f044662a8003781405b342473f6d -->
 
-The diagnostics use a runtime that manually starts copies of the original `FILEIO`, `LIBSD`, and `SG2IOPM1` modules. This is not yet the normal IOP boot sequence. Fresh boot/KERNEL/MANAGER/GAMECORE inputs have now been reconstructed from the supplied disc. The combined runner compiles 9,024 mapped functions and uses live reads at 26,624 imported relocation sites. Supported fields are LUI/ADDIU immediates, LW/SW displacements and J/JAL targets; opcode/register fields and host function layouts remain fixed. Captured module addresses are not guaranteed across runs. The [current report](../docs/reports/2026-11-01-boot-reconstruction.md) distinguishes fresh results from historical probes. A playable boot and Xbox execution remain unverified.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:74c6d70a8a849b4c1be98e8b141565642a172f69fd7a3ee7e9b3dde136b1575b -->
+
+Earlier diagnostics manually started copies of `FILEIO`, `LIBSD`, and `SG2IOPM1`. The current runtime instead reads the requested `IOPRP300.IMG`, starts its FILEIO/LOADFILE/CDVDFSV services, and loads the later original IRXs through the game's DMA/module-buffer flow. <!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:8df0efa22b022ef1c40b1aea3cbd05e6fcf49c48d455ad40cef1148416766c7e -->
+
+The original SCUS now reaches GAMECORE and completes the memory-card dialog through normal Down/X input without manual module injection. Rendering remains corrupted, and a later PATH1/XGKICK packet-size guard stops graphics processing.
+
+<!-- /coderabbit-ai-generated:v1 --> Kernel imports still use the virtual IOP implementation; this is a partial service bootstrap. Fresh boot/KERNEL/MANAGER/GAMECORE inputs have been reconstructed from the supplied disc: 9,024 processed functions, 8,836 recompiled and 188 stubs, with live reads at 26,624 imported relocation sites. Supported fields are LUI/ADDIU immediates, LW/SW displacements and J/JAL targets; opcode/register fields and host function layouts remain fixed. Captured module addresses are not guaranteed across runs. See the [original-module boot report](../docs/reports/2026-11-01-original-iop-boot.md) and [earlier reconstruction report](../docs/reports/2026-11-01-boot-reconstruction.md). A playable boot and Xbox execution remain unverified.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 <!-- /coderabbit-ai-generated:v1 -->
 
