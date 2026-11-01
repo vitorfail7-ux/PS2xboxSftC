@@ -2115,7 +2115,65 @@ void register_ps2_memory_tests()
             t.IsTrue(imageOk, "VIF1 DIRECT image should update GS VRAM through GIF path2");
         });
 
-        tc.Run("VIF1 DIRECT image tag can continue with raw image qwords", [](TestCase &t)
+        tc.Run("VIF1 IMAGE continuation respects DIRECT boundaries and intervening VIF commands", [](TestCase &t)
+        {
+            for (const uint8_t directOpcode : {0x50u, 0x51u})
+            {
+                PS2Memory mem;
+                t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+                GS gs;
+                gs.init(mem.getGSVRAM(), PS2_GS_VRAM_SIZE, &mem.gs());
+                GifArbiter arbiter([&](const uint8_t *data, uint32_t size)
+                {
+                    gs.processGIFPacket(data, size);
+                });
+                mem.setGifArbiter(&arbiter);
+                gs.writeRegister(GS_REG_BITBLTBUF, (1ull << 16) | (1ull << 48));
+                gs.writeRegister(GS_REG_TRXPOS, 0ull);
+                gs.writeRegister(GS_REG_TRXREG, 8ull | (1ull << 32));
+                gs.writeRegister(GS_REG_TRXDIR, 0ull);
+
+                std::vector<uint8_t> packet;
+                appendU32(packet, makeVifCmd(directOpcode, 0u, 1u));
+                appendU64(packet, makeGifTag(2u, GIF_FMT_IMAGE, 0u, true));
+                appendU64(packet, 0ull);
+                appendU32(packet, 0u); // The SOTC stream places a NOP before the next DIRECT.
+                appendU32(packet, makeVifCmd(0x01u, 0u, 0x0101u));
+                appendU32(packet, makeVifCmd(0x6Cu, 1u, 0x20u));
+                const uint32_t sentinel[4] = {0x12345678u, 0x87654321u, 0x11223344u, 0x55667788u};
+                for (const uint32_t word : sentinel)
+                    appendU32(packet, word);
+                appendU32(packet, makeVifCmd(directOpcode, 0u, 1u));
+                for (uint32_t i = 0; i < 16u; ++i)
+                    packet.push_back(static_cast<uint8_t>(0xA0u + i));
+                appendU32(packet, makeVifCmd(0x07u, 0u, 0x1234u));
+                mem.processVIF1Data(packet.data(), static_cast<uint32_t>(packet.size()));
+                t.IsTrue(std::memcmp(mem.getVU1Data() + 0x200u, sentinel, sizeof(sentinel)) == 0,
+                         "IMAGE continuation must not swallow an intervening UNPACK");
+                t.Equals(mem.vif1_regs.mark, 0x1234u, "DIRECT must end at its declared qword count");
+
+                // Continue the GIF IMAGE in a separate VIF buffer, then start a new GIFtag
+                // within the same DIRECT and resume VIF command decoding afterward.
+                packet.clear();
+                appendU32(packet, makeVifCmd(directOpcode, 0u, 2u));
+                for (uint32_t i = 16u; i < 32u; ++i)
+                    packet.push_back(static_cast<uint8_t>(0xA0u + i));
+                appendU64(packet, makeGifTag(0u, GIF_FMT_PACKED, 1u, true));
+                appendU64(packet, 0x0Full);
+                appendU32(packet, makeVifCmd(0x07u, 0u, 0x5678u));
+                mem.processVIF1Data(packet.data(), static_cast<uint32_t>(packet.size()));
+                t.Equals(mem.vif1_regs.mark, 0x5678u, "VIF commands after the continued IMAGE must execute");
+                for (uint32_t x = 0; x < 8u; ++x)
+                {
+                    const uint32_t off = GSPSMCT32::addrPSMCT32(0u, 1u, x, 0u);
+                    for (uint32_t c = 0; c < 4u; ++c)
+                        t.Equals(mem.getGSVRAM()[off + c], static_cast<uint8_t>(0xA0u + x * 4u + c),
+                                 "both DIRECT payloads must reach the GS without VIF command bytes");
+                }
+            }
+        });
+
+        tc.Run("VIF1 DIRECT contains its IMAGE tag and image qwords", [](TestCase &t)
         {
             PS2Memory mem;
             t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
@@ -2141,7 +2199,7 @@ void register_ps2_memory_tests()
             gs.writeRegister(GS_REG_TRXDIR, 0ull);
 
             std::vector<uint8_t> packet;
-            appendU32(packet, makeVifCmd(0x50u, 0u, 1u)); // DIRECT 1 QW payload: GIF IMAGE tag only.
+            appendU32(packet, makeVifCmd(0x50u, 0u, 2u)); // IMAGE tag plus its one-qword payload.
             appendU64(packet, makeGifTag(1u, GIF_FMT_IMAGE, 0u, true));
             appendU64(packet, 0ull);
             for (uint32_t i = 0; i < 16u; ++i)
@@ -2165,7 +2223,7 @@ void register_ps2_memory_tests()
                     }
                 }
             }
-            t.IsTrue(imageOk, "raw qwords after a DIRECT image tag should continue the PATH2 image upload");
+            t.IsTrue(imageOk, "the declared DIRECT payload should upload the image");
         });
 
         tc.Run("VIF1 DIRECT finds an image continuation after packed setup", [](TestCase &t)
@@ -2190,7 +2248,7 @@ void register_ps2_memory_tests()
             gs.writeRegister(GS_REG_TRXDIR, 0ull);
 
             std::vector<uint8_t> packet;
-            appendU32(packet, makeVifCmd(0x50u, 0u, 3u)); // PACKED tag + A+D + IMAGE tag.
+            appendU32(packet, makeVifCmd(0x50u, 0u, 4u)); // PACKED tag + A+D + IMAGE tag + image data.
             appendU64(packet, makeGifTag(1u, GIF_FMT_PACKED, 1u, false));
             appendU64(packet, 0x0Eull);
             appendU64(packet, 0x8000008000ull); // TEXA, harmless setup preceding the IMAGE tag.

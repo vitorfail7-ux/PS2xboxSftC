@@ -90,7 +90,17 @@ Um teste novo declara um pacote PACKED de 8.388.368 bytes e verifica que nenhum 
 
 <!-- /coderabbit-ai-generated:v1 -->
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:7f123f79d0676da1a33b5be0ac95f3a9f94e81080d9a772e92cb9072c2be43b3 -->
+
+## Atualização: causa VIF corrigida
+
+O bloqueio PATH1 descrito acima foi rastreado ao parser VIF: a continuação de IMAGE consumia NOP/DIRECT como pixels e deixava bytes de textura virarem UNPACK. A correção passou 462/462 testes e 4.755 chamadas vetoriais do fluxo capturado sem paradas VU. Na nova inicialização original, o aviso do cartão aparece legível e Down/X avança para a apresentação da Sony. Consulte o [relatório da correção DIRECT](2026-11-01-vif-direct-boundary.md) para a comparação com a versão anterior e os limites da verificação.
+
 ## Xbox e limitações
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 O alvo verificado é desktop Linux com OpenGL 3.3 e Xvfb, sem dispositivo de áudio. Ainda faltam renderização/fluxo jogável, backend e projeto compatíveis com Xbox, pacote e validação com SDK Windows e console real. Não existe pacote Xbox entregue por este avanço.
 

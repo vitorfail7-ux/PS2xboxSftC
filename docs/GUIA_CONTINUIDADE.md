@@ -2,7 +2,13 @@
 
 # Guia de continuidade — Shadow of the Colossus no Xbox
 
-Atualizado em 1º de novembro de 2026. Este repositório contém código experimental e ferramentas de investigação. **Ainda não existe jogo jogável, pacote UWP ou execução validada no Xbox.** O teste mais recente é um executável de diagnóstico Linux que utiliza módulos IOP originais carregados manualmente.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:3bba0fc7331764df1dfdf37d4344d73148a7fc976436e7548fdc0fa3efab8907 -->
+
+Atualizado em 1º de novembro de 2026. Este repositório contém código experimental e ferramentas de investigação. **Ainda não existe pacote UWP ou execução validada no Xbox.** O diagnóstico Linux já inicializa KERNEL, MANAGER e GAMECORE a partir do SCUS e dos módulos IOP originais, sem injeção manual. A correção mais recente preserva os limites de DIRECT/DIRECTHL ao continuar imagens GIF; consulte o [relatório VIF](reports/2026-11-01-vif-direct-boundary.md) para resultados e limites. Jogabilidade completa permanece sem comprovação.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Ponto de partida
 
@@ -15,13 +21,25 @@ O repositório originário informado pelo usuário é [PS2toXBOX99](https://gith
 1. **Arquivos e reconstrução:** ferramentas auditam ELF, IOPRP e XFF e preparam a configuração de recompilação. KERNEL, MANAGER e GAMECORE foram reconstruídos a partir de capturas locais e executados em um diagnóstico combinado. A geração processou 9.024 funções, 26.624 locais de importação e registrou 670 avisos de fluxo de controle que precisam de investigação.
 2. **Recompilador:** suporte a valores relocados em tempo de execução para LUI, ADDIU, LW, SW, J e JAL, incluindo campos, delay slot e retorno. `general.recompile_addresses` preserva funções convidadas selecionadas em vez de substituí-las automaticamente por stubs.
 3. **IOP e arquivos:** memória compartilhada para módulos e heap, carregamento de IRX, chamadas de CD/DVD e I/O, além de captura de alvos ausentes. Um erro de arquivos não encontrados foi atribuído a links simbólicos ignorados pela ISO virtual; a instalação diagnóstica corrigida usa arquivos reais/hardlinks.
-4. **Vídeo e sincronização:** eventos GS SIGNAL/FINISH são entregues ao INTC quando habilitados. O contador gráfico avançou, e o diagnóstico alcançou inicialização de estágio e verificação de memory card. A saída observada ainda é uma tela preta com indicador de carregamento.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:99d7bb4b9e72053e94f413eaf0462172f2ecfb0ed102bd829ac18183d8d33756 -->
+
+4. **Vídeo e sincronização:** eventos GS SIGNAL/FINISH são entregues ao INTC quando habilitados. O reparo dos limites VIF DIRECT/DIRECTHL eliminou a corrupção de textura em UNPACK observada. A inicialização original mostra o aviso do cartão legível e, após Down/X, a apresentação da Sony. A última tela posterior é uma área cinza; título, cenário e jogabilidade continuam sem comprovação.
+
+<!-- /coderabbit-ai-generated:v1 -->
 5. **Controle:** conclusão/IRQ SIO2, callbacks VBlank, barramento e negociação de controle digital, analógico e pacote de pressão. O driver original executou a sequência de configuração e começou leituras periódicas; nas cinco capturas finais a porta 0 apresentou Pad2=1, sync=1 e status DBC=1. Pressão é aproximada a partir dos botões, e vibração física ainda não está implementada.
 <!-- coderabbit-ai-generated:v1 -->
 
 <!-- coderabbit-ai-generated-section:v1:9db8a129e342195ac2bb856599ee20aae14758e8db7a3f38c3fd7e8dfeb61a1c -->
 
-6. **Ferramentas e testes:** nesta continuação, a suíte C++ passou 457 casos, incluindo a regressão da leitura CD para IOP. Os resultados anteriores de cinco suítes IOP e 18 casos Python continuam aplicáveis aos arquivos que não mudaram. Os testes são do ambiente Linux e não comprovam desempenho, jogabilidade ou compatibilidade do Xbox.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:74f56cf9bdd8b656df47b6c903ac5884b0e66d2a8a7ea4c4e8ce82e96670a2b3 -->
+
+6. **Ferramentas e testes:** a suíte C++ Debug passou 462 casos, incluindo a regressão dos limites DIRECT/DIRECTHL. O fluxo gráfico capturado processou 4.755 chamadas vetoriais sem paradas VU após a correção; o parser anterior reproduziu o estouro com as mesmas entradas. Cinco suítes IOP, 47 verificações de captura/cache e 18 casos Python anteriores foram reutilizados para insumos que não mudaram. Os testes Linux não comprovam jogabilidade ou compatibilidade Xbox.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 <!-- /coderabbit-ai-generated:v1 -->
 
@@ -54,7 +72,13 @@ Relatos detalhados: [reconstrução e limitações](reports/2026-11-01-boot-reco
 <!-- /coderabbit-ai-generated:v1 -->
 
 <!-- /coderabbit-ai-generated:v1 -->
-5. Corrija renderização, carregamento de arquivos, áudio e inicialização IOP normal. Reavalie os 670 avisos de fluxo, relocação ao vivo e posições variáveis dos módulos. Implemente SIO2 DMA e vibração conforme necessário, e teste o caminho de pressão real quando houver suporte no host.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:3add57c7594bb66814977c02aeaa4c070f8329d7330a7655efe4b3dafa7bea7f -->
+
+5. Investigue a cena posterior à apresentação, ainda cinza no diagnóstico corrigido; avance na renderização, no carregamento, no áudio e na compatibilidade IOP.
+
+<!-- /coderabbit-ai-generated:v1 --> Reavalie os 670 avisos de fluxo, relocação ao vivo e posições variáveis dos módulos. Implemente SIO2 DMA e vibração conforme necessário, e teste o caminho de pressão real quando houver suporte no host.
 6. Só após um boot repetível no desktop, avalie compilador, gráficos, entrada, armazenamento, áudio, empacotamento e restrições UWP do Xbox Developer Mode. Valide no hardware, registre erros e medições de desempenho e faça testes de regressão em outras versões do jogo.
 
 ## Evidências e limites
@@ -63,7 +87,13 @@ Relatos detalhados: [reconstrução e limitações](reports/2026-11-01-boot-reco
 
 <!-- coderabbit-ai-generated-section:v1:554367313eb48c59c1c79f4c2a3412e9ae219fb3bf37ed4adb9205c5725a7974 -->
 
-O diagnóstico corrigido mais recente foi encerrado deliberadamente pelo wrapper após aproximadamente 245 segundos. Usou Linux, Xvfb/raylib/OpenGL e injeção dos módulos FILEIO, LIBSD e SG2IOPM1; concluiu o diálogo do cartão e preservou o callback que antes era sobrescrito. Não provou inicialização IOP normal, menu legível ou jogabilidade. Dados do disco, dumps de RAM, executáveis gerados e logs locais permanecem fora do repositório público.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:670d0834db2522102e450801c4336333ad44c5e81cd8eeed41a7eda5eeba58c2 -->
+
+Um diagnóstico anterior foi encerrado deliberadamente pelo wrapper após aproximadamente 245 segundos.
+
+<!-- /coderabbit-ai-generated:v1 --> Usou Linux, Xvfb/raylib/OpenGL e injeção dos módulos FILEIO, LIBSD e SG2IOPM1; concluiu o diálogo do cartão e preservou o callback que antes era sobrescrito. Não provou inicialização IOP normal, menu legível ou jogabilidade. Dados do disco, dumps de RAM, executáveis gerados e logs locais permanecem fora do repositório público.
 
 <!-- /coderabbit-ai-generated:v1 -->
 
