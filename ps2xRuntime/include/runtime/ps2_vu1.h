@@ -283,6 +283,7 @@ private:
     void flushPipelines();
     void progressXgkick();
     void finishXgkick();
+    void stopXgkickOverflow(uint64_t requiredBytes);
     uint64_t calculatePairReadyCycle(const DecodedInstructionPair &decoded) const;
     void markPairWrites(const DecodedInstructionPair &decoded);
     bool pipelinesPending() const;

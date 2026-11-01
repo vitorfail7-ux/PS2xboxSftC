@@ -1,4 +1,5 @@
 #include "MiniTest.h"
+#include "ps2_log.h"
 #include "runtime/gs/ps2_gif_arbiter.h"
 #include "runtime/gs/gs_frontend.h"
 #include "runtime/gs/ps2_gs_psmct32.h"
@@ -1134,6 +1135,26 @@ void register_ps2_vu1_tests()
             fx.mem.write64(PS2_VU1_CODE_BASE, packVuInstructionPair(makeVuIaddiu(1u, 0u, 2), kVuUpperNop));
             vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 1u);
             t.Equals(vu1.state().vi[1], 2, "second execution should rebuild decode after the direct write");
+        });
+
+        tc.Run("oversized PATH1 tag reports capacity failure without emitting a packet", [](TestCase &t)
+        {
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "fixture should initialize");
+            size_t delivered = 0;
+            fx.mem.setGifPacketCallback([&](const uint8_t *, uint32_t) { ++delivered; });
+            const uint64_t tag = makeGifTag(32767u, GIF_FMT_PACKED, 0u, true);
+            std::memcpy(fx.data, &tag, sizeof(tag));
+            writeVuInstructionPair(fx.code, 0u, makeVuLowerSpecial(0x6Cu, 0u, 0u), kVuUpperNop);
+            VU1Interpreter vu;
+            ps2_log::clear_runtime_log_entries();
+            vu.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 8u);
+            std::string log;
+            for (const auto &entry : ps2_log::snapshot_runtime_log_entries()) log += entry.text;
+            t.Equals(delivered, size_t(0), "incomplete oversized packet must not reach GS");
+            t.IsTrue(log.find("[VU1 PATH1 overflow]") != std::string::npos, "failure must identify PATH1");
+            t.IsTrue(log.find("required=8388368 capacity=65536") != std::string::npos, "failure must include declared size and capacity");
+            t.IsTrue(log.find("reserved lower") == std::string::npos, "capacity failure is not an unknown opcode");
         });
 
         tc.Run("XGKICK sends a VU memory GIF packet through PATH1", [](TestCase &t)

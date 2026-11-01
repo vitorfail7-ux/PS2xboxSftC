@@ -851,8 +851,7 @@ void VU1Interpreter::progressXgkick()
         m_xgkick.cycleCredit -= 2u;
         if (m_xgkick.copiedBytes > XgkickPipeline::kBufferSize - 16u)
         {
-            reportReservedInstruction(false, 0xFFFFFFFBu);
-            m_xgkick.active = false;
+            stopXgkickOverflow(static_cast<uint64_t>(m_xgkick.copiedBytes) + 16u);
             return;
         }
 
@@ -890,8 +889,7 @@ void VU1Interpreter::progressXgkick()
 
             if (tagBytes > XgkickPipeline::kBufferSize - qwordOffset)
             {
-                reportReservedInstruction(false, 0xFFFFFFFBu);
-                m_xgkick.active = false;
+                stopXgkickOverflow(static_cast<uint64_t>(qwordOffset) + tagBytes);
                 return;
             }
             m_xgkick.currentTagEnd = qwordOffset + static_cast<uint32_t>(tagBytes);
@@ -912,6 +910,22 @@ void VU1Interpreter::progressXgkick()
             }
         }
     }
+}
+
+void VU1Interpreter::stopXgkickOverflow(uint64_t requiredBytes)
+{
+    uint64_t tag = 0;
+    if (m_xgkick.copiedBytes >= 16u && m_xgkick.copiedBytes <= XgkickPipeline::kBufferSize)
+        std::memcpy(&tag, m_xgkick.packet.data() + m_xgkick.copiedBytes - 16u, sizeof(tag));
+    RUNTIME_ERROR("[VU1 PATH1 overflow] cycle=" << m_cycle
+                  << " pc=0x" << std::hex << m_state.pc
+                  << " source=0x" << m_xgkick.sourceAddress
+                  << " lastQwordLo=0x" << tag << std::dec
+                  << " copied=" << m_xgkick.copiedBytes
+                  << " required=" << requiredBytes
+                  << " capacity=" << XgkickPipeline::kBufferSize << '\n');
+    m_stopRequested = true;
+    m_xgkick.active = false;
 }
 
 void VU1Interpreter::finishXgkick()

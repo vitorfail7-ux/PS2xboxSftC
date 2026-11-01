@@ -76,7 +76,19 @@ A imagem passou do indicador de carregamento para fragmentos de texto e faixas c
 
 Um breakpoint identificou que `instruction=0xfffffffb` é o sinal interno do limite de acumulação PATH1/XGKICK. Não representa uma instrução VU desconhecida: a instrução real naquele PC era diferente e a geração do cache correspondia à memória. A captura de 1.600 bytes do pacote mostrou um novo GIFtag após 1.584 bytes, declarando um payload maior que a capacidade restante de 64 KiB. A origem VU era o offset 16.192. A causa dos campos incorretos ou do pacote excessivo ainda não foi determinada entre a produção dos dados e o processamento VIF/VU. Aumentar o limite não constitui uma correção comprovada.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:667eb2257d52ba46761be7e3e446cb9a15fd7c2e106a4aae1b6cac3fb3a7b602 -->
+
 Esse é o próximo bloqueio reproduzido. A execução otimizada demonstra que a espera inicial do cartão não era permanente e confirma a entrega de entrada pelo fluxo original; não estabelece jogabilidade.
+
+### Diagnóstico explícito de capacidade PATH1
+
+A proteção agora registra `[VU1 PATH1 overflow]`, com PC, ciclo, endereço de origem VU, último qword copiado, bytes copiados, tamanho requerido e capacidade. Os dois caminhos de estouro deixam de reportar a instrução sintética `0xfffffffb`. O limite de 64 KiB, a interrupção do processamento e a rejeição do pacote incompleto permanecem iguais. Essa alteração corrige a identificação da falha; não corrige sua origem nem a imagem.
+
+Um teste novo declara um pacote PACKED de 8.388.368 bytes e verifica que nenhum pacote incompleto chega ao GS e que o log identifica tamanho/capacidade sem alegar instrução desconhecida. A suíte Debug passou 461/461, incluindo os testes existentes de temporização PATH1 e visibilidade de stores. A execução nativa em paralelo usou o executável otimizado anterior; não foi uma validação do novo executável do jogo.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Xbox e limitações
 
