@@ -782,6 +782,11 @@ namespace ps2x::iop::detail
         return m_impl->loadModule(path, arguments, argumentSize);
     }
 
+    ModuleLoadResult IopEmulator::loadModuleImage(std::string_view name, const std::vector<uint8_t> &image, const void *arguments, uint32_t argumentSize)
+    {
+        return m_impl->loadImage(std::string(name), image, arguments, argumentSize);
+    }
+
     ModuleLoadResult IopEmulator::loadModuleBuffer(uint32_t guestAddress, const void *arguments, uint32_t argumentSize)
     {
         return m_impl->loadModuleBuffer(guestAddress, arguments, argumentSize);

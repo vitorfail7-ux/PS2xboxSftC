@@ -2,6 +2,7 @@
 #include "ps2_runtime.h"
 #include "ps2_syscalls.h"
 #include "ps2_stubs.h"
+#include "runtime/ps2_iop_image.h"
 
 #include <filesystem>
 #include <fstream>
@@ -170,6 +171,86 @@ void register_ps2_runtime_io_tests()
 {
     MiniTest::Case("PS2RuntimeIO", [](TestCase &tc)
     {
+        tc.Run("SifLoadModuleBuffer reads DMA destination in IOP rather than EE RAM", [](TestCase &t)
+        {
+            TestContext test;
+            constexpr uint32_t bufferAddress = 0x180000;
+            std::vector<uint8_t> image(0x110, 0);
+            auto half = [&](size_t offset, uint16_t value) {
+                image[offset] = uint8_t(value); image[offset+1] = uint8_t(value >> 8);
+            };
+            auto word = [&](size_t offset, uint32_t value) {
+                for (size_t i=0; i<4; ++i) image[offset+i] = uint8_t(value >> (8*i));
+            };
+            image[0]=0x7f; image[1]='E'; image[2]='L'; image[3]='F';
+            image[4]=1; image[5]=1; image[6]=1;
+            half(16, 2); half(18, 8); word(20, 1);
+            word(24, 0x10000); word(28, 52);
+            half(40, 52); half(42, 32); half(44, 1);
+            word(52, 1); word(56, 0x100); word(60, 0x10000); word(64, 0x10000);
+            word(68, 16); word(72, 16); word(76, 5); word(80, 4);
+            word(0x100, 0x00001021); // addu v0,zero,zero: resident module
+            word(0x104, 0x03e00008); // jr ra
+            t.IsTrue(test.runtime.writeIopMemory(bufferAddress, image.data(), image.size()), "DMA destination writable");
+            setRegU32(test.ctx, 4, bufferAddress);
+            setRegU32(test.ctx, 5, 0); setRegU32(test.ctx, 6, 0);
+            ps2_syscalls::sceSifLoadModuleBuffer(test.rdram.data(), &test.ctx, &test.runtime);
+            t.IsTrue(getRegS32(&test.ctx, 2) > 0, "valid IOP image loads despite empty EE memory at same address");
+
+            std::memcpy(test.rdram.data()+bufferAddress, image.data(), image.size());
+            std::fill(image.begin(), image.end(), 0);
+            test.runtime.writeIopMemory(bufferAddress, image.data(), image.size());
+            ps2_syscalls::sceSifLoadModuleBuffer(test.rdram.data(), &test.ctx, &test.runtime);
+            t.Equals(getRegS32(&test.ctx, 2), -1, "valid EE image cannot conceal invalid IOP contents");
+            setRegU32(test.ctx, 4, 0x200000);
+            ps2_syscalls::sceSifLoadModuleBuffer(test.rdram.data(), &test.ctx, &test.runtime);
+            t.Equals(getRegS32(&test.ctx, 2), -1, "out-of-range IOP pointer rejected");
+        });
+
+        tc.Run("invalid requested IOP image fails before resetting active services", [](TestCase &t)
+        {
+            TestContext test;
+            const auto module = test.runtime.loadIopModule("rom0:LIBSD");
+            t.IsTrue(module.moduleId > 0, "preexisting service is active");
+            const auto invalidPath = test.paths.cdRoot / "INVALID.IMG";
+            { std::ofstream output(invalidPath, std::ios::binary); output << "invalid reboot image"; }
+            writeGuestString(test.rdram.data(), GUEST_STRING_AREA_START, "cdrom0:INVALID.IMG;1");
+            setRegU32(test.ctx, 4, GUEST_STRING_AREA_START);
+            ps2_stubs::sceSifRebootIop(test.rdram.data(), &test.ctx, &test.runtime);
+            t.Equals(getRegS32(&test.ctx, 2), 0, "invalid image does not claim reboot success");
+            writeGuestString(test.rdram.data(), GUEST_STRING_AREA_START, "cdrom0:MISSING.IMG;1");
+            ps2_stubs::sceSifRebootIop(test.rdram.data(), &test.ctx, &test.runtime);
+            t.Equals(getRegS32(&test.ctx, 2), 0, "missing image also fails");
+            t.IsTrue(test.runtime.stopIopModule(module.moduleId), "failed reboot preserves the active module lifecycle");
+        });
+
+        tc.Run("IOP reboot image validates directory before publishing members", [](TestCase &t)
+        {
+            std::vector<uint8_t> image(96, 0);
+            auto entry = [&](size_t offset, const char *name, uint32_t size) {
+                std::memcpy(image.data()+offset, name, std::strlen(name));
+                for (size_t j=0; j<4; ++j) image[offset+12+j] = uint8_t(size >> (8*j));
+            };
+            entry(0, "RESET", 0);
+            entry(16, "ROMDIR", 64);
+            entry(32, "FILEIO", 3);
+            image[64]=0x7f; image[65]='E'; image[66]='L';
+            std::map<std::string, std::vector<uint8_t>> members;
+            t.IsTrue(parseIopRebootImage(image, members), "valid aligned member is accepted");
+            t.Equals(members.at("FILEIO").size(), size_t(3), "padding is excluded");
+            t.Equals(members.at("FILEIO")[0], uint8_t(0x7f), "member starts after the directory");
+            auto bad=image; bad[44]=255;
+            t.IsTrue(!parseIopRebootImage(bad, members) && members.empty(), "oversized member cannot leak partial output");
+            bad=image; std::memcpy(bad.data()+32, "ROMDIR", 7);
+            t.IsTrue(!parseIopRebootImage(bad, members), "duplicate names rejected");
+            bad=image; bad[48]='X';
+            t.IsTrue(!parseIopRebootImage(bad, members), "unterminated directory rejected");
+            bad=image; bad[33]=0;
+            t.IsTrue(!parseIopRebootImage(bad, members), "embedded NUL with trailing name bytes rejected");
+            for (size_t length=0; length<48; ++length)
+                t.IsTrue(!parseIopRebootImage(std::span(image.data(), length), members), "short image rejected");
+        });
+
         tc.Run("ROM0 ROMVER is exposed as the 14-byte firmware pseudo-file", [](TestCase &t)
         {
             TestContext test;

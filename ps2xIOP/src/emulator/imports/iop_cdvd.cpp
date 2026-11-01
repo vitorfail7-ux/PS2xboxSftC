@@ -196,6 +196,7 @@ namespace ps2x::iop::detail
             streamFlag = 0u;
             lastReadTimeout = 0u;
             interruptEventFlagId = 0;
+            fsvReadBuffer = 0u;
             virtualIsoBuilt = false;
             virtualIsoValid = false;
             completionCallback.reset();
@@ -291,6 +292,12 @@ namespace ps2x::iop::detail
                 cpu.gpr[2] = previous;
                 return true;
             }
+
+            case 47: // sceGetFsvRbuf: shared CDVDFSV scratch area, see ps2sdk cdvdman.
+                if (fsvReadBuffer == 0u)
+                    fsvReadBuffer = memory.allocate(42128u, 16u);
+                cpu.gpr[2] = fsvReadBuffer;
+                return true;
 
             case 50: // sceCdSC
             {
@@ -760,6 +767,7 @@ namespace ps2x::iop::detail
         uint32_t streamFlag = 0u;
         uint32_t lastReadTimeout = 0u;
         int interruptEventFlagId = 0;
+        uint32_t fsvReadBuffer = 0u;
         uint64_t imageHandle = 0u;
         bool virtualIsoBuilt = false;
         bool virtualIsoValid = false;

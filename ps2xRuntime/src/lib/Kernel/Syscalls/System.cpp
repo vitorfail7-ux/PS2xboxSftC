@@ -296,7 +296,6 @@ namespace ps2_syscalls
             return;
         }
 
-        const std::string moduleTag = makeSifModuleBufferTag(rdram, bufferAddr);
         std::vector<uint8_t> arguments;
         constexpr uint32_t kMaxIopModuleArguments = 64u * 1024u;
         if (!copyGuestBytesBounded(rdram, argumentAddr, argumentSize, kMaxIopModuleArguments, arguments))
@@ -311,7 +310,23 @@ namespace ps2_syscalls
             return;
         }
 
-        const auto loaded = runtime->loadIopModuleBuffer(bufferAddr, arguments.empty() ? nullptr : arguments.data(), static_cast<uint32_t>(arguments.size()));
+        // SifLoadModuleBuffer receives an IOP pointer after EE->IOP DMA.
+        // The public loadIopModuleBuffer API remains the EE-buffer convenience API.
+        constexpr uint32_t iopRamSize = 2u * 1024u * 1024u;
+        if (bufferAddr >= iopRamSize)
+        {
+            setReturnS32(ctx, -1);
+            return;
+        }
+        std::vector<uint8_t> image(iopRamSize - bufferAddr);
+        if (!runtime->readIopMemory(bufferAddr, image.data(), image.size()))
+        {
+            setReturnS32(ctx, -1);
+            return;
+        }
+        const std::string moduleTag = makeSifModuleBufferTag(image);
+        const auto loaded = runtime->loadIopModuleImage(moduleTag, image,
+            arguments.empty() ? nullptr : arguments.data(), static_cast<uint32_t>(arguments.size()));
         if (!loaded.handled || loaded.moduleId <= 0)
         {
             setReturnS32(ctx, -1);

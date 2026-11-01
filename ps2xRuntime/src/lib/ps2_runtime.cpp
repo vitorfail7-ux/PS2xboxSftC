@@ -572,6 +572,12 @@ ps2x::iop::ModuleLoadResult PS2Runtime::loadIopModule(std::string_view path, con
     return m_iopSubsystem->loadModule(path, arguments, argumentSize);
 }
 
+ps2x::iop::ModuleLoadResult PS2Runtime::loadIopModuleImage(std::string_view name, const std::vector<uint8_t> &image, const void *arguments, uint32_t argumentSize)
+{
+    auto scope = m_iopHost->enterCall(nullptr, m_memory.getRDRAM());
+    return m_iopSubsystem->loadModuleImage(name, image, arguments, argumentSize);
+}
+
 ps2x::iop::ModuleLoadResult PS2Runtime::loadIopModuleBuffer(uint32_t guestAddress, const void *arguments, uint32_t argumentSize)
 {
     auto scope = m_iopHost->enterCall(nullptr, m_memory.getRDRAM());

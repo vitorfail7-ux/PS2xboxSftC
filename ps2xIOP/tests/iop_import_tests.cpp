@@ -171,6 +171,27 @@ namespace
                expect(static_cast<int32_t>(cpu.gpr[2]) == expected, "PollEventFlag returned an unexpected result");
     }
 
+    bool testCdvdFsvReadBuffer()
+    {
+        NullHost host;
+        IopMemory memory;
+        IopKernel kernel(memory);
+        kernel.reset();
+        IopCdvd cdvd(host, memory, kernel);
+        cdvd.reset();
+        IopCpuState cpu{};
+        if (!expect(cdvd.dispatchImport(47u, cpu), "sceGetFsvRbuf was not handled")) return false;
+        const uint32_t address = cpu.gpr[2];
+        if (!expect(address != 0u && memory.ownsRamRange(address, 42128u), "FSV buffer must own its full writable range")) return false;
+        memory.write32(address + 42124u, 0xfeed1234u);
+        if (!expect(cdvd.dispatchImport(47u, cpu) && cpu.gpr[2] == address, "FSV buffer address must remain stable") ||
+            !expect(memory.read32(address + 42124u) == 0xfeed1234u, "repeat lookup must preserve buffer data")) return false;
+        memory.reset(); kernel.reset(); cdvd.reset();
+        return expect(cdvd.dispatchImport(47u, cpu) && cpu.gpr[2] != 0u &&
+                      memory.ownsRamRange(cpu.gpr[2], 42128u), "reboot must allocate a fresh FSV buffer") &&
+               expect(memory.read32(cpu.gpr[2] + 42124u) == 0u, "reboot clears buffer contents");
+    }
+
     bool testCdvdSpecialControl()
     {
         NullHost host;
@@ -468,7 +489,7 @@ namespace
 
 int main()
 {
-    if (!testLoadcoreRebootLibraryMode() || !testCdvdSpecialControl() || !testCdromDevctlInterruptEvent() || !testCdvdSearchFile() ||
+    if (!testCdvdFsvReadBuffer() || !testLoadcoreRebootLibraryMode() || !testCdvdSpecialControl() || !testCdromDevctlInterruptEvent() || !testCdvdSearchFile() ||
         !testTimrmanPeriodicCallback() || !testVblankCallbacks())
         return 1;
     std::cout << "ps2xIOP import tests passed\n";

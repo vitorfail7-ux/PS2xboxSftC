@@ -1022,6 +1022,16 @@ int main()
     if (!expect(!iop.canBindRpc(rpcSid),
                 "IOP reset did not remove the registered RPC server")) return 1;
 
+    const std::vector<uint8_t> rpcImage(host.guest.begin()+0x100u, host.guest.end());
+    const auto imageModule = iop.loadModuleImage("FILEIO", rpcImage);
+    if (!expect(imageModule.moduleId > 0 && imageModule.startResult == 0 && iop.canBindRpc(rpcSid),
+                "Byte-image loader must execute the physical RPC server")) return 1;
+    if (!expect(iop.stopModule(imageModule.moduleId) && !iop.canBindRpc(rpcSid),
+                "Stopping byte-image module must remove its server")) return 1;
+    if (!expect(iop.loadModuleImage("FILEIO", {}).moduleId < 0 && !iop.canBindRpc(rpcSid),
+                "Invalid bytes must not activate a named HLE service")) return 1;
+    iop.reset();
+
     constexpr uint32_t lotrSoundSid = 0x00012345u;
     writeRpcServerIrx(host, 0x100u, lotrSoundSid);
     const ModuleLoadResult physicalSoundModule = iop.loadModuleBuffer(0x100u);

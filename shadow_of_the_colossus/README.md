@@ -8,7 +8,17 @@
 
 This is an investigation into an Xbox Series release using the experimental PS2Recomp toolchain. There is no working game build or UWP application yet. Xbox Developer Mode is the intended deployment environment, subject to verification of the graphics, audio, controller, file access, and dependency requirements on a console.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:578178faceb7f6a87220cc412def71f3f15ed9d780f9af55da10fbe3be3a64cc -->
+
+## Current bootstrap progress
+
+The original disc executable now initializes the required IOP services and reaches the GAMECORE entry without manual module injection. Captured XFF stages can be rebuilt with `rebuild_modules.py`; see the [original IOP boot report](../docs/reports/2026-11-01-original-iop-boot.md) for the verified steps, commands and remaining limits. Gameplay and Xbox execution remain unverified.
+
 ## Identify the game version
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Extract the ELF from your own game disc and keep the ELF and disc data outside the repository. From the repository root:
 
