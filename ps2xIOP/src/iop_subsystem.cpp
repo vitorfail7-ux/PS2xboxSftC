@@ -145,6 +145,17 @@ namespace ps2x::iop
         return hle;
     }
 
+    ModuleLoadResult IopSubsystem::loadModuleImage(std::string_view name, const std::vector<uint8_t> &image, const void *arguments, uint32_t argumentSize)
+    {
+        auto result = m_impl->emulator.loadModuleImage(name, image, arguments, argumentSize);
+        if (result.moduleId > 0)
+        {
+            m_impl->moduleManager.observePhysicalLoad(result.moduleId, name);
+            m_impl->rebuildRoutes();
+        }
+        return result;
+    }
+
     ModuleLoadResult IopSubsystem::loadModuleBuffer(uint32_t guestAddress, const void *arguments, uint32_t argumentSize)
     {
         return m_impl->emulator.loadModuleBuffer(guestAddress, arguments, argumentSize);

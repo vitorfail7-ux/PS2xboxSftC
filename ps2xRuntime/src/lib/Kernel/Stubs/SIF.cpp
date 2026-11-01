@@ -4,6 +4,7 @@
 #include "../../ps2_iop_transport.h"
 #include "runtime/ps2_address.h"
 #include "runtime/ee_scheduler.h"
+#include "runtime/ps2_iop_image.h"
 
 #include <algorithm>
 #include <cstring>
@@ -559,7 +560,38 @@ namespace ps2_stubs
 
     void sceSifRebootIop(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
+        const std::string path = readPs2CStringBounded(rdram, runtime, getRegU32(ctx, 4));
+        std::map<std::string, std::vector<uint8_t>> members;
+        if (!path.empty())
+        {
+            if (!runtime) { setReturnS32(ctx, 0); return; }
+            const auto &paths = PS2Runtime::getIoPaths();
+            std::filesystem::path hostPath;
+            if (!runtime->vfs().resolveHostPath(path, {paths.hostRoot, paths.cdRoot, paths.mcRoot}, hostPath))
+            { setReturnS32(ctx, 0); return; }
+            std::ifstream file(hostPath, std::ios::binary | std::ios::ate);
+            const auto size = file.tellg();
+            if (!file || size < 48 || size > 64 * 1024 * 1024)
+            { setReturnS32(ctx, 0); return; }
+            std::vector<uint8_t> image(static_cast<size_t>(size));
+            file.seekg(0);
+            if (!file.read(reinterpret_cast<char *>(image.data()), image.size()) ||
+                !parseIopRebootImage(image, members))
+            { setReturnS32(ctx, 0); return; }
+            for (const auto *name : {"FILEIO", "LOADFILE", "CDVDFSV"})
+                if (!members.contains(name)) { setReturnS32(ctx, 0); return; }
+        }
         PS2IopTransport::reset(runtime);
+        // Kernel imports are supplied by the virtual IOP kernel. Start the
+        // original user-space RPC services from the requested reboot image.
+        for (const auto *name : {"FILEIO", "LOADFILE", "CDVDFSV"})
+        {
+            if (members.empty()) break;
+            const auto loaded = runtime->loadIopModuleImage(name, members.at(name));
+            RUNTIME_LOG("[SifRebootIop] " << name << " id=" << loaded.moduleId << " start=" << loaded.startResult);
+            if (loaded.moduleId <= 0 || (loaded.startResult != 0 && loaded.startResult != 2))
+            { PS2IopTransport::reset(runtime); setReturnS32(ctx, 0); return; }
+        }
         setReturnS32(ctx, 1);
     }
 
@@ -588,6 +620,7 @@ namespace ps2_stubs
 
     void sceSifResetIop(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
+        RUNTIME_LOG("[SifRebootIop] args=" << readPs2CStringBounded(rdram, runtime, getRegU32(ctx, 4)));
         PS2IopTransport::reset(runtime);
         setReturnS32(ctx, 1);
     }

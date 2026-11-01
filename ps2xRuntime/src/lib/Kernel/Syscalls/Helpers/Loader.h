@@ -26,26 +26,6 @@ namespace
         return toLowerAscii(normalizePs2PathSuffix(path));
     }
 
-    uint64_t hashGuestBytesFnv1a64(const uint8_t *rdram, uint32_t guestAddr, size_t byteCount)
-    {
-        constexpr uint64_t kOffset = 1469598103934665603ull;
-        constexpr uint64_t kPrime = 1099511628211ull;
-
-        if (!rdram || guestAddr == 0 || byteCount == 0)
-        {
-            return 0ull;
-        }
-
-        uint64_t hash = kOffset;
-        for (size_t i = 0; i < byteCount; ++i)
-        {
-            const uint8_t b = rdram[(guestAddr + static_cast<uint32_t>(i)) & PS2_RAM_MASK];
-            hash ^= static_cast<uint64_t>(b);
-            hash *= kPrime;
-        }
-        return hash;
-    }
-
     bool copyGuestBytesBounded(const uint8_t *rdram,
                                uint32_t guestAddr,
                                uint32_t byteCount,
@@ -76,10 +56,15 @@ namespace
         return true;
     }
 
-    std::string makeSifModuleBufferTag(const uint8_t *rdram, uint32_t bufferAddr)
+    std::string makeSifModuleBufferTag(const std::vector<uint8_t> &image)
     {
         char key[96] = {};
-        const uint64_t hash = hashGuestBytesFnv1a64(rdram, bufferAddr, kSifModuleBufferProbeBytes);
+        uint64_t hash = 1469598103934665603ull;
+        for (size_t i = 0; i < std::min(image.size(), kSifModuleBufferProbeBytes); ++i)
+        {
+            hash ^= image[i];
+            hash *= 1099511628211ull;
+        }
         std::snprintf(key, sizeof(key), "iopbuf:fnv64:%016llx", static_cast<unsigned long long>(hash));
         return std::string(key);
     }

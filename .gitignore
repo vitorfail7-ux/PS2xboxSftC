@@ -23,3 +23,7 @@ android/app/.cxx/
 android/local.properties
 android/.gradle/ 
 .idea/
+# Python analysis caches and private runtime traces
+__pycache__/
+*.pyc
+ps2_log.txt
